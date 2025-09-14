@@ -1,0 +1,88 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity top_system is
+    Port (
+        clk        : in  std_logic;   -- clock hệ thống (ví dụ 50 MHz)
+        sclk       : out std_logic; 
+        rst        : in std_logic;
+        miso_adc   : in  std_logic;   -- từ ADC
+        mosi_adc   : out std_logic;
+        adc_data   : out std_logic_vector(11 downto 0);
+        cs_adc     : inout std_logic;
+        
+        filter_out_check : out std_logic_vector(11 downto 0);
+        
+        cs_dac     : out std_logic;
+        sck_dac    : out std_logic;
+        dac_out    : out std_logic 
+    );
+end top_system;
+
+architecture Behavioral of top_system is
+    -- ADC data: không dấu, 12 bit
+    signal adc_data_out   : std_logic_vector(11 downto 0);
+    signal filter_out   : std_logic_vector(11 downto 0);
+
+   
+    signal filter_in  : std_logic_vector(11 downto 0);
+   -- signal filter_res : std_logic_vector(11 downto 0);
+    
+   -- signal adc_data_slv : std_logic_vector(11 downto 0);
+begin
+    --------------------------------------------------------------------
+    -- ADC instance
+    --------------------------------------------------------------------
+    u_adc: entity work.SPI_Master_MCP3204
+        port map (
+            clk      => clk,
+            rst      => rst,
+            start    => '1',     -- luôn đọc liên tục
+            miso     => miso_adc,
+            cs       => cs_adc,
+            mosi     => mosi_adc,
+            sclk_out => sclk,
+            data_o   => adc_data_out  -- module ADC thường trả std_logic_vector
+        );
+        
+        
+
+    --------------------------------------------------------------------
+    -- Chuyển dữ liệu ADC sang signed 16 bit cho FIR
+    --------------------------------------------------------------------
+    filter_in <= adc_data_out;
+
+    --------------------------------------------------------------------
+    -- FIR filter instance
+    --------------------------------------------------------------------
+    u_fir: entity work.FIR_Filter
+        port map (
+            clk     => clk,
+            fsclk   => cs_adc,
+            data_i  => filter_in,
+            data_o  => filter_out
+        );
+
+    --------------------------------------------------------------------
+    -- Cắt output FIR (16 bit signed) xuống 12 bit để xuất ra ngoài
+    -- Ở đây lấy 12 bit MSB (15 downto 4), có thể thay đổi tùy scale Q-format
+    --------------------------------------------------------------------
+   adc_data <= adc_data_out;
+   filter_out_check <= filter_out;
+
+
+
+    -- DAC instance
+    u_dac: entity work.spi_dac_module
+        port map (
+            clk_100M    => clk,
+            start_tx    => '1',   -- khi ADC xong thì xuất ra DAC
+            reset_n     => rst, -- lấy 12-bit cao
+            data_in     => filter_out,
+            
+            dac_cs_n   =>   cs_dac,   -- DAC chip select (active low)
+            dac_sck    =>   sck_dac,     -- DAC serial clock
+            dac_sdi    =>   dac_out      -- output system
+        );
+end Behavioral;
