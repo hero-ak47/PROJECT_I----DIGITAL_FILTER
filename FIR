@@ -1,0 +1,106 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+  
+-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+use IEEE.NUMERIC_STD.ALL;
+  
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx leaf cells in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+  
+entity FIR_Filter is
+    generic(
+        FILTER_TAPS : integer := 60;
+        INPUT_WIDTH : integer range 8 to 32 := 12;
+        COEFF_WIDTH : integer range 8 to 32 := 16;
+        OUTPUT_WIDTH : integer range 8 to 32 := 12; -- This should be < (Input+Coeff width-1)
+        WAITING_TIME : integer := 10;
+        ADDR_WIDTH : integer range 8 to 32 := 8
+    );
+    Port ( 
+        clk : in STD_LOGIC;
+        fsclk : in STD_LOGIC;
+        data_i  : in STD_LOGIC_Vector(INPUT_WIDTH-1 downto 0);
+        data_o  : out STD_LOGIC_Vector(INPUT_WIDTH-1 downto 0)
+        
+    );
+end FIR_Filter;
+  
+architecture Behavioral of FIR_Filter is
+  
+type input_registers is array(0 to FILTER_TAPS-1) of signed(INPUT_WIDTH-1 downto 0);
+signal delay_line_s  : input_registers := (others=>(others=>'0'));
+  
+type coefficients is array (0 to 59) of signed( 15 downto 0);
+signal coeff_s: coefficients :=( 
+-- thông thấp 2000hz
+x"0030", x"002A", x"0035", x"003B", x"0038", x"0028", x"0008", x"FFD5", x"FF8F", x"FF38", x"FED3", x"FE67", x"FDFF", x"FDA5", x"FD66", x"FD51", x"FD72",
+ x"FDD2", x"FE79", x"FF69", x"009D", x"020D", x"03AA", x"0561", x"071A", x"08BE", x"0A32", x"0B61", x"0C36", x"0CA4", x"0CA4", x"0C36", x"0B61", x"0A32",
+  x"08BE", x"071A", x"0561", x"03AA", x"020D", x"009D", x"FF69", x"FE79", x"FDD2",
+ x"FD72", x"FD51", x"FD66", x"FDA5", x"FDFF", x"FE67", x"FED3", x"FF38", x"FF8F", x"FFD5", x"0008", x"0028", x"0038", x"003B", x"0035", x"002A", x"0030");
+signal fsclk_q : std_logic := '0';
+
+  
+type state_machine is (idle_st, active_st);
+signal state : state_machine := idle_st;
+  
+signal counter : integer range 0 to FILTER_TAPS-1 := FILTER_TAPS-1;
+  
+signal output       : signed(INPUT_WIDTH+COEFF_WIDTH-1 downto 0) := (others=>'0');
+signal accumulator  : signed(INPUT_WIDTH+COEFF_WIDTH-1 downto 0) := (others=>'0');
+  
+begin
+
+
+  
+data_o <= std_logic_vector(output(INPUT_WIDTH+COEFF_WIDTH-2 downto INPUT_WIDTH+COEFF_WIDTH-OUTPUT_WIDTH-1));
+  
+process(clk)
+  
+variable sum_v : signed(INPUT_WIDTH+COEFF_WIDTH-1 downto 0) := (others=>'0');
+  
+begin
+  
+    if rising_edge(clk) then
+        fsclk_q <= fsclk;
+          
+        case state is
+        when idle_st => 
+            if fsclk = '1' and fsclk_q = '0' then
+                state <= active_st;
+            end if;
+              
+        when active_st =>
+            -- Counter
+            if counter > 0 then
+                counter <= counter - 1;
+            else
+                counter <= FILTER_TAPS-1;
+                state <= idle_st;
+            end if;
+              
+            -- Delay line shifting
+            if counter > 0 then
+                delay_line_s(counter) <= delay_line_s(counter-1);
+            else
+                delay_line_s(counter) <= signed(data_i);
+            end if;
+              
+            -- MAC operations
+            if counter > 0 then
+                sum_v := delay_line_s(counter)*coeff_s(counter);
+                accumulator <= accumulator + sum_v;    
+            else
+                accumulator <= (others=>'0');
+                sum_v := delay_line_s(counter)*coeff_s(counter);
+                output <= accumulator + sum_v;  
+            end if;
+              
+        end case;
+    end if;
+  
+end process;
+
+end Behavioral;
