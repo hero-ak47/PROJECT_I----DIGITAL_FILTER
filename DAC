@@ -1,0 +1,170 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity spi_dac_module is
+    Port ( 
+        clk_100M   : in  STD_LOGIC;     -- 100 MHz clock
+        reset_n    : in  STD_LOGIC;     -- Active-low reset
+        data_in    : in  STD_LOGIC_VECTOR(11 downto 0);  -- Data to send
+        start_tx   : in  STD_LOGIC;     -- Start transmission
+      --  busy       : out STD_LOGIC;     -- Module busy signal
+      --  tx_done    : out STD_LOGIC;     -- Transmission complete pulse
+        
+        -- DAC interface signals
+        dac_cs_n   : out STD_LOGIC;     -- DAC chip select (active low)
+        dac_sck    : out STD_LOGIC;     -- DAC serial clock
+        dac_sdi    : out STD_LOGIC      -- output system
+    );
+end spi_dac_module;
+
+architecture two_process_arch of spi_dac_module is
+    -- Constants
+    constant TOTAL_BITS    : integer := 16;  -- Number of bits to transmit
+    
+    -- State type definition
+    type state_type is (IDLE, LOAD, TRANSMIT, FINISH);
+    
+    signal busy       : std_logic;
+    signal tx_done    : std_logic;
+    
+    -- Register signals
+    signal state_reg         : state_type;
+    signal state_next        : state_type;
+    signal bit_count_reg     : unsigned(4 downto 0);  -- Counter for bits (0-16)
+    signal bit_count_next    : unsigned(4 downto 0);
+    signal sck_count_reg     : unsigned(2 downto 0);  -- Counter for SCK generation
+    signal sck_count_next    : unsigned(2 downto 0);
+    signal shift_reg         : std_logic_vector(15 downto 0);
+    signal shift_reg_next    : std_logic_vector(15 downto 0);
+    
+    -- Output registers
+    signal dac_cs_n_reg      : std_logic;
+    signal dac_sck_reg       : std_logic;
+    signal dac_sdi_reg       : std_logic;
+    signal busy_reg          : std_logic;
+    signal tx_done_reg       : std_logic;
+    
+    -- Next state signals
+    signal dac_cs_n_next     : std_logic;
+    signal dac_sck_next      : std_logic;
+    signal dac_sdi_next      : std_logic;
+    signal busy_next         : std_logic;
+    signal tx_done_next      : std_logic;
+    
+begin
+    -- Register Process
+    process(clk_100M, reset_n)
+    begin
+        if reset_n = '1' then
+            -- Reset all registers
+            state_reg <= IDLE;
+            bit_count_reg <= (others => '0');
+            sck_count_reg <= (others => '0');
+            shift_reg <= (others => '0');
+            
+            -- Reset outputs
+            dac_cs_n_reg <= '1'; -- cs muc cao
+            dac_sck_reg <= '0';  
+            dac_sdi_reg <= '0';
+            busy_reg <= '0';
+            tx_done_reg <= '0';
+            
+        elsif rising_edge(clk_100M) then
+            -- Update all registers
+            state_reg <= state_next;
+            bit_count_reg <= bit_count_next;
+            sck_count_reg <= sck_count_next;
+            shift_reg <= shift_reg_next;
+            
+            -- Update outputs
+            dac_cs_n_reg <= dac_cs_n_next;
+            dac_sck_reg <= dac_sck_next;
+            dac_sdi_reg <= dac_sdi_next;
+            busy_reg <= busy_next;
+            tx_done_reg <= tx_done_next;
+        end if;
+    end process;
+
+    -- Combinational Logic Process
+    process(state_reg,      bit_count_reg,      sck_count_reg, 
+            shift_reg,      start_tx,           data_in, 
+            dac_cs_n_reg,   dac_sck_reg,        dac_sdi_reg, 
+            busy_reg,       tx_done_reg)
+    begin
+        -- Default assignments (hold current values)
+        state_next <= state_reg;
+        bit_count_next <= bit_count_reg;
+        sck_count_next <= sck_count_reg;
+        shift_reg_next <= shift_reg;
+        dac_cs_n_next <= dac_cs_n_reg;
+        dac_sck_next <= dac_sck_reg;
+        dac_sdi_next <= dac_sdi_reg;
+        busy_next <= busy_reg;
+        tx_done_next <= '0';  -- Pulse signal, default to '0'
+
+        case state_reg is
+            when IDLE =>
+                dac_cs_n_next <= '1';  -- cs mức cao
+                dac_sck_next <= '0';   -- chưa có xung
+                busy_next <= '0';      -- vẫn rảnh
+                sck_count_next <= (others => '0');  -- reset bộ đếm
+                
+                if start_tx = '1' then  -- bật start
+                    state_next <= LOAD;
+                    busy_next <= '1';  -- báo bận
+                end if;
+
+            when LOAD =>
+                shift_reg_next <= "0111" & data_in; -- nạp data vào thanh ghi
+                bit_count_next <= to_unsigned(TOTAL_BITS-1, bit_count_next'length);
+                dac_cs_n_next <= '0';  -- Assert CS - kéo cs xuống
+                state_next <= TRANSMIT;
+
+            when TRANSMIT =>
+                -- Generate SCK and handle data transmission
+                
+                sck_count_next <= sck_count_reg + 1;
+                
+                -- SCK timing and data handling
+                case sck_count_reg is
+                    when "000" =>  -- Setup data
+                        dac_sck_next <= '0';
+                        dac_sdi_next <= shift_reg(15);
+                        
+                    when "010" =>  -- Rising edge of SCK
+                        dac_sck_next <= '1';
+                        
+                    when "100" =>  -- Falling edge, shift data
+                        dac_sck_next <= '0';
+                        shift_reg_next <= shift_reg(14 downto 0) & '0';
+                        
+                        -- Check if all bits are sent
+                        if bit_count_reg = 0 then
+                            state_next <= FINISH;
+                        else
+                            bit_count_next <= bit_count_reg - 1;
+                        end if;
+                        sck_count_next <= (others => '0');
+                        
+                    when others =>
+                        null;
+                end case;
+
+            when FINISH =>
+                dac_cs_n_next <= '1'; -- cs kéo lên 
+                dac_sck_next <= '0';
+                tx_done_next <= '1';
+                state_next <= IDLE;
+                
+        end case;
+    end process;
+
+    -- Output assignments
+    dac_cs_n <= dac_cs_n_reg;
+    dac_sck <= dac_sck_reg;
+    dac_sdi <= dac_sdi_reg;
+    busy <= busy_reg;
+    tx_done <= tx_done_reg;
+    
+end two_process_arch;
