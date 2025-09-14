@@ -1,0 +1,164 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity SPI_Master_MCP3204 is
+    port(
+        clk     : in  std_logic;   -- clock hệ thống
+        rst     : in  std_logic;
+        start   : in  std_logic;   -- bắt đầu 1 lần đọc
+        miso    : in  std_logic;   -- từ MCP3204
+        mosi    : out std_logic;   -- đến MCP3204
+        cs      : out std_logic;   -- chip select
+        data_o  : out std_logic_vector(11 downto 0);
+        sclk_out: out std_logic   -- thêm cổng debug
+       -- led_check : out std_logic
+    );
+end SPI_Master_MCP3204;
+
+architecture rtl of SPI_Master_MCP3204 is
+    type state_type is (idle, send_cmd, recv_data, finish);
+    signal state_reg, state_next : state_type;
+
+    -- shift reg cho 5 bit lệnh: 1(start) + 1(SGL) + 2(channel) + 1(dummy)
+    signal cmd_reg, cmd_next : std_logic; -- CH0
+    signal cmd_cnt_reg, cmd_cnt_next : unsigned(4 downto 0);
+    -- shift reg cho dữ liệu
+    signal data_reg, data_next  : std_logic_vector(11 downto 0) := (others=>'0');
+    signal bit_cnt_reg, bit_cnt_next   : unsigned(4 downto 0); -- 1 null + 12 bit data
+
+    signal mosi_reg, mosi_next  : std_logic ;
+    signal cs_reg, cs_next    : std_logic ;
+    --signal done_reg, done_next  : std_logic;
+
+    signal sclk : std_logic ;
+    signal sclk_prev : std_logic ;
+    
+    signal led_check : std_logic ;
+begin
+
+   IC1 : entity work.tao_xung_sclk
+      port map (
+        clk => clk,
+        sclk_output => sclk
+      );
+    
+     -- process 1
+    process(clk, rst)
+    begin
+      if (rst = '1') then
+         led_check <= '1';
+         state_reg <= idle;
+         cmd_reg <= '0';
+         cmd_cnt_reg <= (others => '0');
+         data_reg <= (others => '0');
+         bit_cnt_reg <= (others => '0');
+         cs_reg    <= '1';
+         mosi_reg  <= '0';
+        -- done_reg  <= '0';
+         sclk_prev <= '0';
+         
+       elsif rising_edge(clk) then
+         led_check <= '0';
+         state_reg <= state_next;
+         cmd_reg <= cmd_next;
+         cmd_cnt_reg <= cmd_cnt_next;
+         data_reg <= data_next;
+         bit_cnt_reg <=  bit_cnt_next;
+         cs_reg    <= cs_next;
+         mosi_reg  <= mosi_next;
+         --done_reg  <= done_next;
+         sclk_prev <= sclk;  
+       end if;
+    end process;     
+         
+    
+-- process 2
+    -- FSM
+    process(state_reg, sclk, cmd_reg, cmd_cnt_reg, data_reg,
+    bit_cnt_reg,cs_reg, mosi_reg, start, miso)
+    begin
+        -- giu mac dinh
+         state_next <= state_reg;
+         cmd_next <= cmd_reg;
+         cmd_cnt_next <= cmd_cnt_reg;
+         data_next <= data_reg;
+         bit_cnt_next <=  bit_cnt_reg;
+         cs_next    <= cs_reg;
+         mosi_next  <= mosi_reg;
+         --done_next  <= done_reg;
+        -- sclk <= sclk_prev; 
+
+            case state_reg is
+                when idle =>  -- IDLE
+                   if ( sclk_prev='1' and sclk='0') then
+                    cs_next   <= '1';
+                    end if;
+                    if start = '1' then
+                       -- cmd_next  <= '1'; -- đọc CH0
+                        cmd_cnt_next  <=(others => '0');
+                        state_next <= send_cmd;
+                    end if;
+
+                when send_cmd =>
+                    -- xuất MOSI ở cạnh xuống SCLK 
+                     if ( sclk_prev='1' and sclk='0') then 
+                    cs_next   <= '0';
+                    end if;
+                    if (sclk_prev='1' and sclk='0') then
+                        mosi_next <= '1';
+                        --cmd_next  <= cmd_next(3 downto 0) & '0';                       
+                        if cmd_cnt_reg = 2 then
+                            if (sclk_prev='1' and sclk='0') then
+                                   mosi_next <= '0';
+                                   state_next <= recv_data;
+                                   bit_cnt_next   <= (others => '0');
+                             end if;      
+                        else
+                           cmd_cnt_next  <= cmd_cnt_reg + 1;    
+                        end if;
+                    end if;
+
+                when recv_data =>
+                    -- lấy MISO ở cạnh lên SCLK
+                    if (sclk_prev='0' and sclk= '1') then
+                        if (bit_cnt_reg > 4 ) then
+                            -- bỏ null bit
+                          --  null;
+                        --else
+                            data_next <= data_next(10 downto 0) & miso;
+                        end if;
+
+                       
+                        if bit_cnt_reg = 16 then
+                           
+                            state_next <= finish;
+                        else
+                            bit_cnt_next <= bit_cnt_reg + 1;    
+                        end if;
+                    end if;
+
+                when finish =>
+                     if ( sclk_prev='1' and sclk='0') then
+                        if bit_cnt_reg = 16 then
+                           -- if (sclk_prev='1' and sclk='0') then 
+                               data_o <= data_reg;
+                             --  end if;         
+                             cs_next   <= '1';
+                        state_next <= idle;               
+                        else
+                            bit_cnt_next <= bit_cnt_reg + 1;    
+                        end if;
+                        
+                      end if;
+
+            end case;
+    end process;
+    
+    -- output
+    mosi  <= mosi_reg;
+    cs    <= cs_reg;
+    --data_o <= data_reg;
+    sclk_out <= sclk;
+
+end rtl;
