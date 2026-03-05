@@ -12,7 +12,7 @@ use IEEE.NUMERIC_STD.ALL;
   
 entity FIR_Filter is
     generic(
-        FILTER_TAPS : integer := 60;
+        FILTER_TAPS : integer := 123;
         INPUT_WIDTH : integer range 8 to 32 := 12;
         COEFF_WIDTH : integer range 8 to 32 := 16;
         OUTPUT_WIDTH : integer range 8 to 32 := 12; -- This should be < (Input+Coeff width-1)
@@ -33,13 +33,16 @@ architecture Behavioral of FIR_Filter is
 type input_registers is array(0 to FILTER_TAPS-1) of signed(INPUT_WIDTH-1 downto 0);
 signal delay_line_s  : input_registers := (others=>(others=>'0'));
   
-type coefficients is array (0 to 59) of signed( 15 downto 0);
+type coefficients is array (0 to 122) of signed( 15 downto 0);
 signal coeff_s: coefficients :=( 
--- thông thấp 2000hz
-x"0030", x"002A", x"0035", x"003B", x"0038", x"0028", x"0008", x"FFD5", x"FF8F", x"FF38", x"FED3", x"FE67", x"FDFF", x"FDA5", x"FD66", x"FD51", x"FD72",
- x"FDD2", x"FE79", x"FF69", x"009D", x"020D", x"03AA", x"0561", x"071A", x"08BE", x"0A32", x"0B61", x"0C36", x"0CA4", x"0CA4", x"0C36", x"0B61", x"0A32",
-  x"08BE", x"071A", x"0561", x"03AA", x"020D", x"009D", x"FF69", x"FE79", x"FDD2",
- x"FD72", x"FD51", x"FD66", x"FDA5", x"FDFF", x"FE67", x"FED3", x"FF38", x"FF8F", x"FFD5", x"0008", x"0028", x"0038", x"003B", x"0035", x"002A", x"0030");
+-- thông dải 12000hz
+x"0000", x"0008", x"0000", x"FFF2", x"0000", x"0019", x"0000", x"FFDA", x"0000", x"0033", x"0000", x"FFC2", x"0000", x"0043", x"0000", x"FFC2", x"0000", x"0028",
+x"0000", x"0001", x"0000", x"FFC0", x"0000", x"0096", x"0000", x"FF02", x"0000", x"0172", x"0000", x"FE1B", x"0000", x"0248", x"0000", x"FD75", x"0000", x"0299",
+x"0000", x"FD9E", x"0000", x"01D7", x"0000", x"FF0F", x"0000", x"FFB0", x"0000", x"01E5", x"0000", x"FC45", x"0000", x"05BA", x"0000", x"F83F", x"0000", x"09AD",
+x"0000", x"F4A6", x"0000", x"0CA7", x"0000", x"F285", x"0000", x"0DC3", x"0000", x"F285", x"0000", x"0CA7", x"0000", x"F4A6", x"0000", x"09AD", x"0000", x"F83F",
+x"0000", x"05BA", x"0000", x"FC45", x"0000", x"01E5", x"0000", x"FFB0", x"0000", x"FF0F", x"0000", x"01D7", x"0000", x"FD9E", x"0000", x"0299", x"0000", x"FD75",
+x"0000", x"0248", x"0000", x"FE1B", x"0000", x"0172", x"0000", x"FF02", x"0000", x"0096", x"0000", x"FFC0", x"0000", x"0001", x"0000"
+, x"0028", x"0000", x"FFC2", x"0000", x"0043", x"0000", x"FFC2", x"0000", x"0033", x"0000", x"FFDA", x"0000", x"0019", x"0000", x"FFF2", x"0000", x"0008", x"0000");
 signal fsclk_q : std_logic := '0';
 
   
