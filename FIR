@@ -12,7 +12,7 @@ use IEEE.NUMERIC_STD.ALL;
   
 entity FIR_Filter is
     generic(
-        FILTER_TAPS : integer := 128;
+        FILTER_TAPS : integer := 500;
         INPUT_WIDTH : integer range 8 to 32 := 12;
         COEFF_WIDTH : integer range 8 to 32 := 16;
         OUTPUT_WIDTH : integer range 8 to 32 := 12; -- This should be < (Input+Coeff width-1)
@@ -33,17 +33,37 @@ architecture Behavioral of FIR_Filter is
 type input_registers is array(0 to FILTER_TAPS-1) of signed(INPUT_WIDTH-1 downto 0);
 signal delay_line_s  : input_registers := (others=>(others=>'0'));
   
-type coefficients is array (0 to 127) of signed( 15 downto 0);
+type coefficients is array (0 to 499) of signed( 15 downto 0);
 signal coeff_s: coefficients :=( 
 -- thông dải 12000hz
-x"0000", x"0008", x"0001", x"FFF3", x"FFFD", x"0016", x"0009", x"FFE0", x"FFEF", x"0029", x"001C", x"FFD1", x"FFD9", x"002F", x"002F", x"FFD9", x"FFD3", x"0019",
-x"001D", x"FFF9", x"0007", x"FFF5", x"FFBF", x"0014", x"0092", x"FFF4", x"FF0C", x"FFED", x"015C", x"004C", x"FE45", x"FF63", x"0200", x"00FB", x"FDE3", x"FEAC",
-x"0206", x"0192", x"FE47", x"FE67", x"013D", x"0150", x"FF59", x"FF5B", x"0013", x"FF91", x"005D", x"01E4", x"FF7A", x"FC5F", x"004A", x"057F", x"0067", x"F8B1",
-x"FE73", x"08DD", x"0315", x"F608", x"FB26", x"0A7F", x"06AC", x"F5A0", x"F7AB", x"099F", x"099F", x"F7AB", x"F5A0", x"06AC", x"0A7F", x"FB26", x"F608", x"0315",
-x"08DD", x"FE73", x"F8B1", x"0067", x"057F", x"004A", x"FC5F", x"FF7A", x"01E4", x"005D", x"FF91", x"0013", x"FF5B", x"FF59", x"0150", x"013D", x"FE67", x"FE47",
-x"0192", x"0206", x"FEAC", x"FDE3", x"00FB", x"0200", x"FF63", x"FE45", x"004C", x"015C", x"FFED", x"FF0C", x"FFF4", x"0092", x"0014", x"FFBF", x"FFF5", x"0007",
-x"FFF9", x"001D",
-x"0019", x"FFD3", x"FFD9", x"002F", x"002F", x"FFD9", x"FFD1", x"001C", x"0029", x"FFEF", x"FFE0", x"0009", x"0016", x"FFFD", x"FFF3", x"0001", x"0008", x"0000");
+x"FFDC", x"001D", x"0000", x"FFF2", x"FFF7", x"0005", x"0014", x"001D", x"001D", x"0016", x"000D", x"0004", x"FFFE", x"FFF9", x"FFF6", x"FFF3", x"FFF1", x"FFF1",
+x"FFF3", x"FFF7", x"FFFD", x"0005", x"000C", x"0011", x"0014", x"0014", x"0011", x"000B", x"0005", x"FFFE", x"FFF7", x"FFF2", x"FFEF", x"FFEF", x"FFF1", x"FFF5",
+x"FFFA", x"0000", x"0005", x"0009", x"000B", x"000B", x"0009", x"0007", x"0004", x"0001", x"FFFF", x"FFFE", x"FFFE", x"0000", x"0001", x"0003", x"0003", x"0002",
+x"FFFF", x"FFFB", x"FFF7", x"FFF3", x"FFF0", x"FFF0", x"FFF2", x"FFF8", x"0000", x"000A", x"0013", x"001C", x"0020", x"0021", x"001C", x"0013", x"0005", x"FFF5",
+x"FFE6", x"FFD9", x"FFD1", x"FFCF", x"FFD5", x"FFE1", x"FFF2", x"0007", x"001B", x"002D", x"0038", x"003C", x"0037", x"002A", x"0017", x"0000", x"FFE9", x"FFD5",
+x"FFC7", x"FFC1", x"FFC4", x"FFD0", x"FFE2", x"FFF8", x"000F", x"0022", x"0030", x"0036", x"0034", x"002B", x"001D", x"000C", x"FFFA", x"FFEC", x"FFE2", x"FFDE",
+x"FFE0", x"FFE6", x"FFEF", x"FFF8", x"0000", x"0005", x"0006", x"0004", x"0000", x"FFFB", x"FFF9", x"FFF9", x"FFFE", x"0006", x"0012", x"001E", x"0028", x"002E",
+x"002C", x"0022", x"0010", x"FFF7", x"FFDC", x"FFC2", x"FFAF", x"FFA5", x"FFA9", x"FFBA", x"FFD8", x"0000", x"002B", x"0054", x"0073", x"0084", x"0082", x"006C",
+x"0046", x"0013", x"FFDA", x"FFA5", x"FF7A", x"FF62", x"FF5F", x"FF74", x"FF9E", x"FFD6", x"0015", x"0052", x"0084", x"00A2", x"00AA", x"0099", x"0073", x"003D",
+x"0000", x"FFC5", x"FF94", x"FF75", x"FF6B", x"FF77", x"FF95", x"FFC0", x"FFF0", x"001E", x"0042", x"0058", x"005E", x"0056", x"0042", x"0028", x"000E", x"FFFA",
+x"FFEF", x"FFEF", x"FFF7", x"0003", x"000F", x"0015", x"0011", x"0000", x"FFE4", x"FFC2", x"FF9F", x"FF84", x"FF7A", x"FF86", x"FFAB", x"FFE8", x"0035", x"0088",
+x"00D3", x"0108", x"011B", x"0104", x"00C0", x"0056", x"FFD2", x"FF46", x"FEC7", x"FE6A", x"FE42", x"FE59", x"FEB2", x"FF45", x"0000", x"00C9", x"0184", x"0213",
+x"025D", x"0252", x"01F0", x"013F", x"0055", x"FF52", x"FE5B", x"FD94", x"FD1F", x"FD0F", x"FD6B", x"FE2B", x"FF36", x"0068", x"0196", x"0293", x"033A", x"036F",
+x"0327", x"026A", x"0150", x"0000", x"FEA9", x"FD7D", x"FCA7", x"FC48", x"FC6F", x"FD18", x"FE2D", x"FF86", x"00F3", x"0240", x"033C", x"03C4", x"03C4", x"033C",
+x"0240", x"00F3", x"FF86", x"FE2D", x"FD18", x"FC6F", x"FC48", x"FCA7", x"FD7D", x"FEA9", x"0000", x"0150", x"026A", x"0327", x"036F", x"033A", x"0293", x"0196",
+x"0068", x"FF36", x"FE2B", x"FD6B", x"FD0F", x"FD1F", x"FD94", x"FE5B", x"FF52", x"0055", x"013F", x"01F0", x"0252", x"025D", x"0213", x"0184", x"00C9", x"0000",
+x"FF45", x"FEB2", x"FE59", x"FE42", x"FE6A", x"FEC7", x"FF46", x"FFD2", x"0056", x"00C0", x"0104", x"011B", x"0108", x"00D3", x"0088", x"0035", x"FFE8", x"FFAB",
+x"FF86", x"FF7A", x"FF84", x"FF9F", x"FFC2", x"FFE4", x"0000", x"0011", x"0015", x"000F", x"0003", x"FFF7", x"FFEF", x"FFEF", x"FFFA", x"000E", x"0028", x"0042",
+x"0056", x"005E", x"0058", x"0042", x"001E", x"FFF0", x"FFC0", x"FF95", x"FF77", x"FF6B", x"FF75", x"FF94", x"FFC5", x"0000", x"003D", x"0073", x"0099", x"00AA",
+x"00A2", x"0084", x"0052", x"0015", x"FFD6", x"FF9E", x"FF74", x"FF5F", x"FF62", x"FF7A", x"FFA5", x"FFDA", x"0013", x"0046", x"006C", x"0082", x"0084", x"0073",
+x"0054", x"002B", x"0000", x"FFD8", x"FFBA", x"FFA9", x"FFA5", x"FFAF", x"FFC2", x"FFDC", x"FFF7", x"0010", x"0022", x"002C", x"002E", x"0028", x"001E", x"0012",
+x"0006", x"FFFE", x"FFF9", x"FFF9", x"FFFB", x"0000", x"0004", x"0006", x"0005", x"0000", x"FFF8", x"FFEF", x"FFE6", x"FFE0", x"FFDE", x"FFE2", x"FFEC", x"FFFA",
+x"000C", x"001D", x"002B", x"0034", x"0036", x"0030", x"0022", x"000F", x"FFF8", x"FFE2", x"FFD0", x"FFC4", x"FFC1", x"FFC7", x"FFD5", x"FFE9", x"0000", x"0017",
+x"002A", x"0037", x"003C", x"0038", x"002D", x"001B", x"0007", x"FFF2", x"FFE1", x"FFD5", x"FFCF", x"FFD1", x"FFD9", x"FFE6", x"FFF5", x"0005", x"0013", x"001C",
+x"0021", x"0020", x"001C", x"0013", x"000A", x"0000", x"FFF8", x"FFF2", x"FFF0", x"FFF0", x"FFF3", x"FFF7", x"FFFB", x"FFFF", x"0002", x"0003", x"0003", x"0001",
+x"0000", x"FFFE", x"FFFE", x"FFFF", x"0001", x"0004", x"0007", x"0009", x"000B", x"000B", x"0009", x"0005", x"0000", x"FFFA", x"FFF5", x"FFF1", x"FFEF", x"FFEF",
+x"FFF2", x"FFF7", x"FFFE", x"0005", x"000B", x"0011", x"0014", x"0014", x"0011", x"000C", x"0005", x"FFFD", x"FFF7", x"FFF3",
+x"FFF1", x"FFF1", x"FFF3", x"FFF6", x"FFF9", x"FFFE", x"0004", x"000D", x"0016", x"001D", x"001D", x"0014", x"0005", x"FFF7", x"FFF2", x"0000", x"001D", x"FFDC");
 signal fsclk_q : std_logic := '0';
 
   
@@ -108,3 +128,5 @@ begin
 end process;
 
 end Behavioral;
+
+
