@@ -12,7 +12,7 @@ use IEEE.NUMERIC_STD.ALL;
   
 entity FIR_Filter is
     generic(
-        FILTER_TAPS : integer := 123;
+        FILTER_TAPS : integer := 128;
         INPUT_WIDTH : integer range 8 to 32 := 12;
         COEFF_WIDTH : integer range 8 to 32 := 16;
         OUTPUT_WIDTH : integer range 8 to 32 := 12; -- This should be < (Input+Coeff width-1)
@@ -21,7 +21,7 @@ entity FIR_Filter is
     );
     Port ( 
         clk : in STD_LOGIC;
-        fsclk : in STD_LOGIC;
+        fsclk : in STD_LOGIC;    -- 50khz
         data_i  : in STD_LOGIC_Vector(INPUT_WIDTH-1 downto 0);
         data_o  : out STD_LOGIC_Vector(INPUT_WIDTH-1 downto 0)
         
@@ -33,16 +33,17 @@ architecture Behavioral of FIR_Filter is
 type input_registers is array(0 to FILTER_TAPS-1) of signed(INPUT_WIDTH-1 downto 0);
 signal delay_line_s  : input_registers := (others=>(others=>'0'));
   
-type coefficients is array (0 to 122) of signed( 15 downto 0);
+type coefficients is array (0 to 127) of signed( 15 downto 0);
 signal coeff_s: coefficients :=( 
 -- thông dải 12000hz
-x"0000", x"0008", x"0000", x"FFF2", x"0000", x"0019", x"0000", x"FFDA", x"0000", x"0033", x"0000", x"FFC2", x"0000", x"0043", x"0000", x"FFC2", x"0000", x"0028",
-x"0000", x"0001", x"0000", x"FFC0", x"0000", x"0096", x"0000", x"FF02", x"0000", x"0172", x"0000", x"FE1B", x"0000", x"0248", x"0000", x"FD75", x"0000", x"0299",
-x"0000", x"FD9E", x"0000", x"01D7", x"0000", x"FF0F", x"0000", x"FFB0", x"0000", x"01E5", x"0000", x"FC45", x"0000", x"05BA", x"0000", x"F83F", x"0000", x"09AD",
-x"0000", x"F4A6", x"0000", x"0CA7", x"0000", x"F285", x"0000", x"0DC3", x"0000", x"F285", x"0000", x"0CA7", x"0000", x"F4A6", x"0000", x"09AD", x"0000", x"F83F",
-x"0000", x"05BA", x"0000", x"FC45", x"0000", x"01E5", x"0000", x"FFB0", x"0000", x"FF0F", x"0000", x"01D7", x"0000", x"FD9E", x"0000", x"0299", x"0000", x"FD75",
-x"0000", x"0248", x"0000", x"FE1B", x"0000", x"0172", x"0000", x"FF02", x"0000", x"0096", x"0000", x"FFC0", x"0000", x"0001", x"0000"
-, x"0028", x"0000", x"FFC2", x"0000", x"0043", x"0000", x"FFC2", x"0000", x"0033", x"0000", x"FFDA", x"0000", x"0019", x"0000", x"FFF2", x"0000", x"0008", x"0000");
+x"0000", x"0008", x"0001", x"FFF3", x"FFFD", x"0016", x"0009", x"FFE0", x"FFEF", x"0029", x"001C", x"FFD1", x"FFD9", x"002F", x"002F", x"FFD9", x"FFD3", x"0019",
+x"001D", x"FFF9", x"0007", x"FFF5", x"FFBF", x"0014", x"0092", x"FFF4", x"FF0C", x"FFED", x"015C", x"004C", x"FE45", x"FF63", x"0200", x"00FB", x"FDE3", x"FEAC",
+x"0206", x"0192", x"FE47", x"FE67", x"013D", x"0150", x"FF59", x"FF5B", x"0013", x"FF91", x"005D", x"01E4", x"FF7A", x"FC5F", x"004A", x"057F", x"0067", x"F8B1",
+x"FE73", x"08DD", x"0315", x"F608", x"FB26", x"0A7F", x"06AC", x"F5A0", x"F7AB", x"099F", x"099F", x"F7AB", x"F5A0", x"06AC", x"0A7F", x"FB26", x"F608", x"0315",
+x"08DD", x"FE73", x"F8B1", x"0067", x"057F", x"004A", x"FC5F", x"FF7A", x"01E4", x"005D", x"FF91", x"0013", x"FF5B", x"FF59", x"0150", x"013D", x"FE67", x"FE47",
+x"0192", x"0206", x"FEAC", x"FDE3", x"00FB", x"0200", x"FF63", x"FE45", x"004C", x"015C", x"FFED", x"FF0C", x"FFF4", x"0092", x"0014", x"FFBF", x"FFF5", x"0007",
+x"FFF9", x"001D",
+x"0019", x"FFD3", x"FFD9", x"002F", x"002F", x"FFD9", x"FFD1", x"001C", x"0029", x"FFEF", x"FFE0", x"0009", x"0016", x"FFFD", x"FFF3", x"0001", x"0008", x"0000");
 signal fsclk_q : std_logic := '0';
 
   
